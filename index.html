@@ -381,6 +381,22 @@
             background-color: #2e7d32;
             color: white;
         }
+#toast {
+    position: fixed;
+    top: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #2e7d32; /* সবুজ ব্যাকগ্রাউন্ড */
+    color: #ffffff;            /* সাদা টেক্সট */
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: bold;
+    z-index: 10000;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
     </style>
 </head>
 <body>
@@ -399,7 +415,7 @@
         <div class="timer" id="timer">01:30:00</div>
         <button class="hamburger-btn" onclick="togglePalette()" title="Toggle Question Palette">&#9776;</button>
     </header>
-
+<div id="toast">File Downloading...</div>
     <div class="main-container">
         <div class="content-area">
             <div class="sections-bar">
@@ -471,7 +487,8 @@
                 </div>
             </div>
             <div class="scoreboard-footer">
-                <button class="btn-score-action btn-cancel-score" onclick="closeScoreboard()">Cancel</button>
+<button class="btn-score-action btn-cancel-score" onclick="closePageAndPopup()">Exit</button>
+
                 <button class="btn-score-action btn-download-pdf" onclick="downloadPDF()">Download PDF</button>
             </div>
         </div>
@@ -756,6 +773,10 @@
 
         // Rebuilt PDF generation using html2pdf.js for full Bengali text compatibility
         function downloadPDF() {
+ // টোস্ট দেখানোর কোড
+    const toast = document.getElementById('toast');
+    toast.style.display = 'block';
+
             const now = new Date();
             const hh = String(now.getHours()).padStart(2, '0');
             const mm = String(now.getMinutes()).padStart(2, '0');
@@ -825,19 +846,48 @@
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
-            html2pdf().from(reportDiv).set(options).save();
+           html2pdf().from(reportDiv).set(options).save().then(() => {
+    setTimeout(() => {
+        toast.style.display = 'none';
+    }, 3000);
+});
         }
 
-        let totalSeconds = 90 * 60;
-        setInterval(() => {
-            if (totalSeconds > 0) {
-                totalSeconds--;
-                let hrs = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-                let mins = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-                let secs = (totalSeconds % 60).toString().padStart(2, '0');
-                document.getElementById('timer').innerText = `${hrs}:${mins}:${secs}`;
-            }
-        }, 1000);
+
+let totalSeconds = 90 * 60;
+let timerInterval = setInterval(() => {
+    if (totalSeconds > 0) {
+        totalSeconds--;
+        let hrs = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+        let mins = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+        let secs = (totalSeconds % 60).toString().padStart(2, '0');
+        document.getElementById('timer').innerText = `${hrs}:${mins}:${secs}`;
+        
+        // সময় শেষ হলে এই ব্লকটি কাজ করবে
+        if (totalSeconds === 0) {
+            clearInterval(timerInterval);
+            alert("সময় শেষ! আপনার পরীক্ষাটি স্বয়ংক্রিয়ভাবে জমা হয়ে গেছে।");
+            
+            // অটো সাবমিট ও স্কোরবোর্ড দেখানোর লজিক
+            evaluationResults = calculateResults();
+            
+            document.getElementById('sb-total').innerText = evaluationResults.total;
+            document.getElementById('sb-attempted').innerText = evaluationResults.attempted;
+            document.getElementById('sb-right').innerText = evaluationResults.right;
+            document.getElementById('sb-wrong').innerText = evaluationResults.wrong;
+            document.getElementById('sb-marks').innerText = evaluationResults.finalMarks;
+            
+            document.getElementById('scoreboardOverlay').style.display = 'flex';
+        }
+    }
+}, 1000);
+
+function closePageAndPopup() {
+    // প্রথমে স্কোরবোর্ড পপআপ লুকিয়ে ফেলবে
+    document.getElementById('scoreboardOverlay').style.display = 'none';
+    // এরপর পুরো পেজ বা ট্যাব বন্ধ করে দেবে
+    window.close();
+}
 
         loadExternalData();
     </script>
