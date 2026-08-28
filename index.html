@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>RRB CBT 2 Test - Advanced Randomizer</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- html2pdf.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         :root {
             --primary-color: #1976d2;
@@ -488,7 +489,6 @@
         let currentFilter = 'all';
         let evaluationResults = null;
 
-        // Fisher-Yates shuffle algorithm to randomly pick items from 1000+ pools
         function getRandomSubset(arr, count) {
             let shuffled = [...arr];
             for (let i = shuffled.length - 1; i > 0; i--) {
@@ -498,43 +498,39 @@
             return shuffled.slice(0, count);
         }
 
+        async function loadExternalData() {
+            try {
+                const [gaRes, mathRes, reasoningRes] = await Promise.all([
+                    fetch('./GA.json'),
+                    fetch('./Math.json'),
+                    fetch('./Reasoning.json')
+                ]);
 
-async function loadExternalData() {
-    try {
-        // Fetch directly from server every time, storing data only in RAM (variables)
-        const [gaRes, mathRes, reasoningRes] = await Promise.all([
-            fetch('./GA.json'),
-            fetch('./Math.json'),
-            fetch('./Reasoning.json')
-        ]);
+                if (!gaRes.ok || !mathRes.ok || !reasoningRes.ok) {
+                    throw new Error("Failed to fetch JSON files from the server.");
+                }
 
-        if (!gaRes.ok || !mathRes.ok || !reasoningRes.ok) {
-            throw new Error("Failed to fetch JSON files from the server.");
+                const gaData = await gaRes.json();
+                const mathData = await mathRes.json();
+                const reasoningData = await reasoningRes.json();
+
+                sectionsData[0].questions = getRandomSubset(gaData, 50).map(q => ({ ...q, status: "unattempted", selected: null }));
+                sectionsData[1].questions = getRandomSubset(mathData, 35).map(q => ({ ...q, status: "unattempted", selected: null }));
+                sectionsData[2].questions = getRandomSubset(reasoningData, 35).map(q => ({ ...q, status: "unattempted", selected: null }));
+
+                document.getElementById('loadingOverlay').style.display = 'none';
+
+                renderQuestion();
+                renderPalette();
+            } catch (error) {
+                console.error("Loading error:", error);
+                document.getElementById('loadingOverlay').innerHTML = `
+                    <div style="color: #ff6b6b; padding: 20px; text-align: center;">
+                        Error loading questions. Please ensure GA.json, Math.json, and Reasoning.json are in the root directory.
+                    </div>
+                `;
+            }
         }
-
-        const gaData = await gaRes.json();
-        const mathData = await mathRes.json();
-        const reasoningData = await reasoningRes.json();
-
-        // Randomly sample and store directly into RAM (sectionsData runtime memory)
-        sectionsData[0].questions = getRandomSubset(gaData, 50).map(q => ({ ...q, status: "unattempted", selected: null }));
-        sectionsData[1].questions = getRandomSubset(mathData, 35).map(q => ({ ...q, status: "unattempted", selected: null }));
-        sectionsData[2].questions = getRandomSubset(reasoningData, 35).map(q => ({ ...q, status: "unattempted", selected: null }));
-
-        // Hide loading overlay once loaded into memory
-        document.getElementById('loadingOverlay').style.display = 'none';
-
-        renderQuestion();
-        renderPalette();
-    } catch (error) {
-        console.error("Loading error:", error);
-        document.getElementById('loadingOverlay').innerHTML = `
-            <div style="color: #ff6b6b; padding: 20px; text-align: center;">
-                Error loading questions. Please ensure GA.json, Math.json, and Reasoning.json are in the root directory.
-            </div>
-        `;
-    }
-}
 
         function getTotalQuestionsCount() {
             return sectionsData.reduce((acc, sec) => acc + sec.questions.length, 0);
@@ -758,102 +754,78 @@ async function loadExternalData() {
             document.getElementById('scoreboardOverlay').style.display = 'none';
         }
 
+        // Rebuilt PDF generation using html2pdf.js for full Bengali text compatibility
         function downloadPDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            
             const now = new Date();
             const hh = String(now.getHours()).padStart(2, '0');
             const mm = String(now.getMinutes()).padStart(2, '0');
             const ss = String(now.getSeconds()).padStart(2, '0');
             
-            let y = 15;
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(16);
-            doc.text("RRB CBT 2 Test - Performance Report", 105, y, { align: 'center' });
-            
-            y += 7;
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(10);
-            doc.text(`Date & Time: ${now.toLocaleString()}`, 105, y, { align: 'center' });
-            
-            y += 10;
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(12);
-            doc.text("Score Summary:", 15, y);
-            
-            y += 6;
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(10);
-            doc.text(`Total Questions: ${evaluationResults.total}`, 15, y);
-            doc.text(`Attempted: ${evaluationResults.attempted}`, 90, y);
-            y += 6;
-            doc.text(`Right Answers: ${evaluationResults.right}`, 15, y);
-            doc.text(`Wrong Answers: ${evaluationResults.wrong}`, 90, y);
-            y += 6;
-            doc.text(`Final Marks: ${evaluationResults.finalMarks} (1/3 Negative Marking Applied)`, 15, y);
-            
-            y += 8;
-            doc.setLineWidth(0.5);
-            doc.line(15, y, 195, y);
-            
-            y += 10;
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(12);
-            doc.text("Detailed Question Analysis:", 15, y);
-            y += 8;
-            
+            const reportDiv = document.createElement('div');
+            reportDiv.style.padding = '20px';
+            reportDiv.style.fontFamily = 'Arial, sans-serif';
+            reportDiv.style.color = '#333';
+            reportDiv.style.background = '#fff';
+
+            let htmlContent = `
+                <h2 style="text-align: center; color: #1976d2; margin-bottom: 5px;">RRB CBT 2 Test - Performance Report</h2>
+                <p style="text-align: center; font-size: 11px; color: #666; margin-bottom: 20px;">Date & Time: ${now.toLocaleString()}</p>
+                
+                <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #ddd;">
+                    <h3 style="margin-bottom: 8px; font-size: 13px; color: #333;">Score Summary:</h3>
+                    <p style="font-size: 11px; margin: 4px 0;"><strong>Total Questions:</strong> ${evaluationResults.total} &nbsp;&nbsp;&nbsp;&nbsp; <strong>Attempted:</strong> ${evaluationResults.attempted}</p>
+                    <p style="font-size: 11px; margin: 4px 0;"><strong>Right Answers:</strong> <span style="color: #2e7d32;">${evaluationResults.right}</span> &nbsp;&nbsp;&nbsp;&nbsp; <strong>Wrong Answers:</strong> <span style="color: #d32f2f;">${evaluationResults.wrong}</span></p>
+                    <p style="font-size: 12px; margin-top: 6px; color: #d32f2f;"><strong>Final Marks:</strong> ${evaluationResults.finalMarks} (1/3 Negative Marking Applied)</p>
+                </div>
+
+                <h3 style="font-size: 13px; border-bottom: 2px solid #1976d2; padding-bottom: 4px; margin-bottom: 15px;">Detailed Question Analysis:</h3>
+            `;
+
             let globalQNum = 1;
             sectionsData.forEach((sec) => {
-                if (y > 270) { doc.addPage(); y = 20; }
-                doc.setFont("helvetica", "bold");
-                doc.setFontSize(11);
-                doc.setTextColor(25, 118, 210);
-                doc.text(`Section: ${sec.name}`, 15, y);
-                doc.setTextColor(0, 0, 0);
-                y += 6;
+                htmlContent += `<h4 style="color: #1976d2; margin-top: 15px; margin-bottom: 8px; font-size: 12px;">Section: ${sec.name}</h4>`;
                 
                 sec.questions.forEach((q) => {
-                    if (y > 265) { doc.addPage(); y = 20; }
+                    htmlContent += `<div style="margin-bottom: 10px; font-size: 10.5px;">`;
+                    htmlContent += `<p style="font-weight: bold; margin-bottom: 3px;">Q.${globalQNum}: ${q.q}</p>`;
                     
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(9);
-                    const splitQ = doc.splitTextToSize(`Q.${globalQNum}: ${q.q}`, 180);
-                    doc.text(splitQ, 15, y);
-                    y += (splitQ.length * 4.5) + 2;
-                    
-                    doc.setFont("helvetica", "normal");
-                    doc.setFontSize(8.5);
                     q.options.forEach((opt, oIdx) => {
-                        if (y > 275) { doc.addPage(); y = 20; }
-                        let prefix = `   (${String.fromCharCode(97 + oIdx)}) ${opt}`;
+                        let prefix = `(${String.fromCharCode(97 + oIdx)}) ${opt}`;
                         let isCorrect = (oIdx === q.correct);
                         let isSelected = (oIdx === q.selected);
-                        
+                        let style = "color: #555; margin-left: 12px; margin-bottom: 2px;";
+                        let suffix = "";
+
                         if (isCorrect && isSelected) {
-                            doc.setTextColor(0, 128, 0);
-                            prefix += " [Correct][Your Answer]";
+                            style = "color: #2e7d32; font-weight: bold; margin-left: 12px; margin-bottom: 2px;";
+                            suffix = " [Correct] [Your Answer]";
                         } else if (isCorrect) {
-                            doc.setTextColor(0, 128, 0);
-                            prefix += " [Correct]";
+                            style = "color: #2e7d32; font-weight: bold; margin-left: 12px; margin-bottom: 2px;";
+                            suffix = " [Correct]";
                         } else if (isSelected && !isCorrect) {
-                            doc.setTextColor(200, 0, 0);
-                            prefix += " [Your Answer]";
-                        } else {
-                            doc.setTextColor(80, 80, 80);
+                            style = "color: #d32f2f; font-weight: bold; margin-left: 12px; margin-bottom: 2px;";
+                            suffix = " [Your Answer]";
                         }
-                        
-                        doc.text(prefix, 18, y);
-                        doc.setTextColor(0, 0, 0);
-                        y += 4.5;
+
+                        htmlContent += `<div style="${style}">${prefix}${suffix}</div>`;
                     });
-                    
-                    y += 5;
+
+                    htmlContent += `</div>`;
                     globalQNum++;
                 });
             });
-            
-            doc.save(`RRB_CBT2_Test_Report_${hh}${mm}${ss}.pdf`);
+
+            reportDiv.innerHTML = htmlContent;
+
+            const options = {
+                margin: 10,
+                filename: `RRB_CBT2_Test_Report_${hh}${mm}${ss}.pdf`,
+                image: { type: 'jpeg', quality: 0.9 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().from(reportDiv).set(options).save();
         }
 
         let totalSeconds = 90 * 60;
@@ -867,7 +839,6 @@ async function loadExternalData() {
             }
         }, 1000);
 
-        // Execute data loading and random sampling on initial app boot
         loadExternalData();
     </script>
 </body>
