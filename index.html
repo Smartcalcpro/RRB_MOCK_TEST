@@ -502,9 +502,9 @@
             try {
                 // Fetching large external JSON files containing 1000+ items each
                 const [gaRes, mathRes, reasoningRes] = await Promise.all([
-                    fetch('/RRB_MOCK_TEST/GA.json'),
-                    fetch('/RRB_MOCK_TEST/Math.json'),
-                    fetch('/RRB_MOCK_TEST/Reasoning.json')
+                    fetch('GA.json'),
+                    fetch('Math.json'),
+                    fetch('Reasoning.json')
                 ]);
 
                 if (!gaRes.ok || !mathRes.ok || !reasoningRes.ok) {
