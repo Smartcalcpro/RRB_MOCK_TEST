@@ -518,7 +518,7 @@ async function loadExternalData() {
 
         // Randomly sample and store directly into RAM (sectionsData runtime memory)
         sectionsData[0].questions = getRandomSubset(gaData, 50).map(q => ({ ...q, status: "unattempted", selected: null }));
-        sectionsData[1].questions = getRandomSubset(mathData, 30).map(q => ({ ...q, status: "unattempted", selected: null }));
+        sectionsData[1].questions = getRandomSubset(mathData, 35).map(q => ({ ...q, status: "unattempted", selected: null }));
         sectionsData[2].questions = getRandomSubset(reasoningData, 35).map(q => ({ ...q, status: "unattempted", selected: null }));
 
         // Hide loading overlay once loaded into memory
