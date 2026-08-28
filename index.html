@@ -498,42 +498,43 @@
             return shuffled.slice(0, count);
         }
 
-        async function loadExternalData() {
-            try {
-                // Fetching large external JSON files containing 1000+ items each
-                const [gaRes, mathRes, reasoningRes] = await Promise.all([
-                    fetch('GA.json'),
-                    fetch('Math.json'),
-                    fetch('Reasoning.json')
-                ]);
 
-                if (!gaRes.ok || !mathRes.ok || !reasoningRes.ok) {
-                    throw new Error("Failed to fetch JSON files from the server.");
-                }
+async function loadExternalData() {
+    try {
+        // Fetch directly from server every time, storing data only in RAM (variables)
+        const [gaRes, mathRes, reasoningRes] = await Promise.all([
+            fetch('./GA.json'),
+            fetch('./Math.json'),
+            fetch('./Reasoning.json')
+        ]);
 
-                const gaData = await gaRes.json();
-                const mathData = await mathRes.json();
-                const reasoningData = await reasoningRes.json();
-
-                // Randomly sample required configuration amounts (e.g., GA: 50, Math: 30, Reasoning: 35)
-                sectionsData[0].questions = getRandomSubset(gaData, 50).map(q => ({ ...q, status: "unattempted", selected: null }));
-                sectionsData[1].questions = getRandomSubset(mathData, 30).map(q => ({ ...q, status: "unattempted", selected: null }));
-                sectionsData[2].questions = getRandomSubset(reasoningData, 35).map(q => ({ ...q, status: "unattempted", selected: null }));
-
-                // Automatically hide loading overlay once loaded and parsed successfully
-                document.getElementById('loadingOverlay').style.display = 'none';
-
-                renderQuestion();
-                renderPalette();
-            } catch (error) {
-                console.error("Loading error:", error);
-                document.getElementById('loadingOverlay').innerHTML = `
-                    <div style="color: #ff6b6b; padding: 20px; text-align: center;">
-                        Error loading questions. Please ensure GA.json, Math.json, and Reasoning.json are correctly placed and hosted via a local or live web server.
-                    </div>
-                `;
-            }
+        if (!gaRes.ok || !mathRes.ok || !reasoningRes.ok) {
+            throw new Error("Failed to fetch JSON files from the server.");
         }
+
+        const gaData = await gaRes.json();
+        const mathData = await mathRes.json();
+        const reasoningData = await reasoningRes.json();
+
+        // Randomly sample and store directly into RAM (sectionsData runtime memory)
+        sectionsData[0].questions = getRandomSubset(gaData, 50).map(q => ({ ...q, status: "unattempted", selected: null }));
+        sectionsData[1].questions = getRandomSubset(mathData, 30).map(q => ({ ...q, status: "unattempted", selected: null }));
+        sectionsData[2].questions = getRandomSubset(reasoningData, 35).map(q => ({ ...q, status: "unattempted", selected: null }));
+
+        // Hide loading overlay once loaded into memory
+        document.getElementById('loadingOverlay').style.display = 'none';
+
+        renderQuestion();
+        renderPalette();
+    } catch (error) {
+        console.error("Loading error:", error);
+        document.getElementById('loadingOverlay').innerHTML = `
+            <div style="color: #ff6b6b; padding: 20px; text-align: center;">
+                Error loading questions. Please ensure GA.json, Math.json, and Reasoning.json are in the root directory.
+            </div>
+        `;
+    }
+}
 
         function getTotalQuestionsCount() {
             return sectionsData.reduce((acc, sec) => acc + sec.questions.length, 0);
